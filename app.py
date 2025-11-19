@@ -1,10 +1,25 @@
 from flask import Flask, request, abort
+from flask_smorest import Api, Blueprint
 from uuid import uuid4
 from db import specializations, course_items
+from resources.course_item import blp as CourseItemBlueprint
+from resources.specializations import blp as SpecializationBlueprint
 
 app = Flask(__name__)
 
-@app.get("/specialization/<string:specialization_id>")
+app.config["API_TITLE"] = "TBS Web Services API"
+app.config["API_VERSION"] = "v1"
+app.config["OPENAPI_VERSION"] = "3.0.3"
+app.config["OPENAPI_URL_PREFIX"] = "/"
+app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger"
+app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@4/"
+api = Api(app)
+
+
+api.register_blueprint(SpecializationBlueprint, description="Operations on specializations")
+api.register_blueprint(CourseItemBlueprint, description="Operations on course_items")
+
+"""@app.get("/specialization/<string:specialization_id>")
 def get_specialization(specialization_id):
     try:
         return {"specialization": specializations[specialization_id]}
@@ -126,7 +141,7 @@ def update_course_item(course_item_id):
         return course_item
 
     except KeyError:
-        return {"message": "Course item not found"}, 404
+        return {"message": "Course item not found"}, 404 """
     
 
 
