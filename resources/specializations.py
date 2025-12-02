@@ -1,10 +1,10 @@
+
 import uuid
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from db import specializations
-
-
+from schemas import Specialization_Schema
 
 
 blp = Blueprint("specializations", __name__, description="Operations on specializations")
@@ -12,6 +12,7 @@ blp = Blueprint("specializations", __name__, description="Operations on speciali
 
 @blp.route("/specialization/<string:specialization_id>")
 class Specialization(MethodView):
+    @blp.response(200, Specialization_Schema)
     def get(self, specialization_id):
         try:
             return specializations[specialization_id]
@@ -28,16 +29,21 @@ class Specialization(MethodView):
 
 @blp.route("/specialization")
 class SpecializationList(MethodView):
+    @blp.response(200, Specialization_Schema(many=True))
     def get(self):
         return {"specializations": list(specializations.values())}
 
-    def post(self):
-        specialization_data = request.get_json()
+
+    @blp.arguments(Specialization_Schema)
+    @blp.response(200, Specialization_Schema)
+    def post(self, specialization_data):
+        """specialization_data = request.get_json()
         if "name" not in specialization_data:
             abort(
                 400,
                 message="Bad request. Ensure 'name' is included in the JSON payload.",
             )
+        """
         for specialization in specializations.values():
             if specialization_data["name"] == specialization["name"]:
                 abort(400, message="Specialization already exists.")

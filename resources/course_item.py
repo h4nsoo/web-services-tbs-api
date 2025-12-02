@@ -2,15 +2,16 @@ import uuid
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
+from schemas import Course_ItemSchema, Course_ItemUpdateSchema
 
 from db import course_items
 
 blp = Blueprint("Course_Items", __name__, description="Operations on course_items")
 
 
-
 @blp.route("/course_item/<string:course_item_id>")
 class Course_Item(MethodView):
+    @blp.response(200, Course_ItemSchema)
     def get(self, course_item_id):
         try:
             return course_items[course_item_id]
@@ -24,13 +25,14 @@ class Course_Item(MethodView):
         except KeyError:
             abort(404, message="Course_Item not found.")
 
-    def put(self, course_item_id):
-        course_item_data = request.get_json()
-        if "type" not in course_item_data or "name" not in course_item_data:
-            abort(
-                400,
-                message="Bad request. Ensure 'type', and 'name' are included in the JSON payload.",
-            )
+    @blp.arguments(Course_ItemUpdateSchema)
+    @blp.response(200, Course_ItemUpdateSchema)
+    def put(self, course_item_data, course_item_id):
+        """#course_item_data = request.get_json()
+        #if "type" not in course_item_data or "name" not in course_item_data:
+        #    abort(
+        #        400,
+        #        message="Bad request. Ensure 'type', and 'name' are included in the JSON payload.",)"""
         try:
             course_item = course_items[course_item_id]
             course_item |= course_item_data
@@ -41,25 +43,22 @@ class Course_Item(MethodView):
 
 
 @blp.route("/course_item")
-class ItemList(MethodView):
+class Course_ItemList(MethodView):
+    @blp.response(200, Course_ItemSchema(many=True))
     def get(self):
-        return {"course_items": list(course_items.values())}
+        #return {"course_items": list(course_items.values())}
+        return list(course_items.values())
+   
 
-    def post(self):
-        course_item_data = request.get_json()
-        if (
-            "type" not in course_item_data
-            or "specialization_id" not in course_item_data
-            or "name" not in course_item_data
-        ):
-            abort(
-                400,
-                message="Bad request. Ensure 'type', 'specialization_id', and 'name' are included in the JSON payload.",
-            )
-        for course_item in course_items.values():
+    @blp.arguments(Course_ItemSchema)
+    @blp.response(201, Course_ItemSchema)
+    def post(self, course_item_data):
+        # `course_item_data` is provided by the decorator and already validated
+        # Basic duplicate check
+        for existing in course_items.values():
             if (
-                course_item_data["name"] == item["name"]
-                and course_item_data["specialization_id"] == item["specialization_id"]
+                course_item_data.get("name") == existing.get("name")
+                and course_item_data.get("specialization_id") == existing.get("specialization_id")
             ):
                 abort(400, message="Course_Item already exists.")
 
