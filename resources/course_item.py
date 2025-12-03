@@ -1,69 +1,67 @@
 import uuid
-from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
-from schemas import Course_ItemSchema, Course_ItemUpdateSchema
+from schemas import course_item_schema, course_item_update_schema
+from db import db, CourseItemModel, SpecializationModel
 
-from db import course_items
 
 blp = Blueprint("Course_Items", __name__, description="Operations on course_items")
 
 
 @blp.route("/course_item/<string:course_item_id>")
 class Course_Item(MethodView):
-    @blp.response(200, Course_ItemSchema)
+    @blp.response(200, course_item_schema)
     def get(self, course_item_id):
-        try:
-            return course_items[course_item_id]
-        except KeyError:
-            abort(404, message="Course_Item not found.")
+        course_item = CourseItemModel.query.get_or_404(course_item_id)
+        return course_item
 
     def delete(self, course_item_id):
-        try:
-            del course_items[course_item_id]
-            return {"message": "Course_item deleted."}
-        except KeyError:
-            abort(404, message="Course_Item not found.")
+        course_item = CourseItemModel.query.get_or_404(course_item_id)
+        db.session.delete(course_item)
+        db.session.commit()
+        return {"message": "Course_item deleted."}
 
-    @blp.arguments(Course_ItemUpdateSchema)
-    @blp.response(200, Course_ItemUpdateSchema)
+    @blp.arguments(course_item_update_schema)
+    @blp.response(200, course_item_update_schema)
     def put(self, course_item_data, course_item_id):
-        """#course_item_data = request.get_json()
-        #if "type" not in course_item_data or "name" not in course_item_data:
-        #    abort(
-        #        400,
-        #        message="Bad request. Ensure 'type', and 'name' are included in the JSON payload.",)"""
-        try:
-            course_item = course_items[course_item_id]
-            course_item |= course_item_data
-
-            return course_item
-        except KeyError:
-            abort(404, message="Course_Item not found.")
+        course_item = CourseItemModel.query.get_or_404(course_item_id)
+        
+        course_item.name = course_item_data.get("name", course_item.name)
+        course_item.type = course_item_data.get("type", course_item.type)
+        course_item.specialization_id = course_item_data.get("specialization_id", course_item.specialization_id)
+        
+        db.session.commit()
+        return course_item
 
 
 @blp.route("/course_item")
 class Course_ItemList(MethodView):
-    @blp.response(200, Course_ItemSchema(many=True))
+    @blp.response(200, course_item_schema(many=True))
     def get(self):
-        #return {"course_items": list(course_items.values())}
-        return list(course_items.values())
+        return CourseItemModel.query.all()
    
-
-    @blp.arguments(Course_ItemSchema)
-    @blp.response(201, Course_ItemSchema)
+    @blp.arguments(course_item_schema)
+    @blp.response(201, course_item_schema)
     def post(self, course_item_data):
-        # `course_item_data` is provided by the decorator and already validated
-        # Basic duplicate check
-        for existing in course_items.values():
-            if (
-                course_item_data.get("name") == existing.get("name")
-                and course_item_data.get("specialization_id") == existing.get("specialization_id")
-            ):
-                abort(400, message="Course_Item already exists.")
+        # Check if specialization exists
+        specialization = SpecializationModel.query.get(course_item_data["specialization_id"])
+        if not specialization:
+            abort(404, message="Specialization not found.")
+        
+        # Check for duplicate
+        existing = CourseItemModel.query.filter_by(
+            name=course_item_data["name"],
+            specialization_id=course_item_data["specialization_id"]
+        ).first()
+        
+        if existing:
+            abort(400, message="Course_Item already exists.")
 
-        course_item_id = uuid.uuid4().hex
-        course_item = {**course_item_data, "id": course_item_id}
-        course_items[course_item_id] = course_item
+        course_item = CourseItemModel(
+            id=uuid.uuid4().hex,
+            **course_item_data
+        )
+        db.session.add(course_item)
+        db.session.commit()
 
         return course_item
